@@ -1,8 +1,8 @@
 """
-YOLO Model Manager for Person Detection
+YOLO Model Manager for Face Detection
 
-This module handles initialization and management of the YOLO model
-used for person detection. It follows the same pattern as the Hugging Face
+This module handles initialization and management of the YOLOv11n face detection model
+from Hugging Face. It follows the same pattern as the Hugging Face
 example with pre-loading and caching capabilities.
 """
 
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 class YOLOModelManager:
     """
-    Centralized manager for YOLO model with pre-loading and caching capabilities.
+    Centralized manager for YOLO face detection model with pre-loading and caching capabilities.
 
     This class handles the initialization and management of the YOLO model:
     - Pre-loads model at startup to avoid loading delays during inference
@@ -33,19 +33,28 @@ class YOLOModelManager:
 
     async def initialize_model(self):
         """
-        Initialize and pre-load the YOLO model at startup.
+        Initialize and pre-load the YOLOv11n face detection model from Hugging Face.
 
         This is called once when the Temporal worker starts up, ensuring
         the model is ready before any workflow activities need it.
         Pre-loading prevents cold-start delays during actual inference.
         """
-        logger.info("Initializing YOLO model...")
+        logger.info("Initializing YOLOv11n face detection model...")
 
         try:
-            # Load YOLO nano model (fast and lightweight)
-            # This will download the model on first use
-            logger.info("Loading YOLOv8n model...")
-            self.model = YOLO("yolov8n.pt")
+            # Load YOLOv11n face detection model from Hugging Face
+            # Model: https://huggingface.co/AdamCodd/YOLOv11n-face-detection
+            logger.info("Loading YOLOv11n-face-detection model from Hugging Face...")
+
+            # Download the model from Hugging Face hub
+            from huggingface_hub import hf_hub_download
+            model_path = hf_hub_download(
+                repo_id="AdamCodd/YOLOv11n-face-detection",
+                filename="model.pt"
+            )
+            logger.info(f"Model downloaded to: {model_path}")
+
+            self.model = YOLO(model_path)
 
             # Warm up the model with a dummy prediction to ensure it's fully loaded
             logger.info("Warming up model...")
@@ -56,12 +65,12 @@ class YOLOModelManager:
             dummy_image = Image.fromarray(np.zeros((320, 320, 3), dtype=np.uint8))
             _ = self.model(dummy_image, verbose=False)
 
-            logger.info("YOLO model initialization complete")
+            logger.info("YOLOv11n face detection model initialization complete")
 
         except Exception as e:
             # Re-raise the exception after logging - this will prevent the worker
             # from starting if the model fails to load
-            logger.error(f"Failed to load YOLO model: {e}")
+            logger.error(f"Failed to load YOLOv11n face detection model: {e}")
             raise
 
     def get_model(self) -> YOLO:

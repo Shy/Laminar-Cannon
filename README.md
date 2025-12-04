@@ -1,70 +1,147 @@
-**About the Nukit Laminar Cannon**
----
-The Laminar Cannon is an experimental device for directing a cohesive stream of highly filtered air at an individual in motion.
+# Laminar Cannon
 
-![Nukit Laminar Cannon](https://github.com/opennukit/Nukit-Laminar-Cannon/blob/main/Content/Laminar-Canon-Front-and-Back.jpg?raw=true)
+A face-tracking air purifier that automatically aims filtered air at people using computer vision and pan/tilt servos.
 
-There have been ongoing efforts to build laminar flow air filters in an attempt to create a pocket of clean air around an individual. Dilution is an accepted method of reducing the pathogen load in a given space, and this can, with some difficulty, be done somewhat locally. “Somewhat” because air is a fluid and wants to mix, so this is an extremely challenging task to accomplish, and the reduction is usually modest at best.
+## Highlights
 
-There has been some success in creating a zone of cleaner air, only to find another problem- if the target of that cohesive air stream moves even slightly off-axis, they are no longer breathing filtered air.
+- 🎯 Real-time face tracking with YOLO detection
+- 🌀 Automatically directs HEPA-filtered air toward detected faces
+- 🤖 Distributed workflow orchestration with Temporal
+- 🎮 Raspberry Pi Zero 2W controls servos and fans via GPIO
+- 📹 Works with standard Pi Camera Module
 
-What the Laminar Cannon attempts to do is solve a hardware problem with software, using modern, low-cost face-tracking hardware to ensure that the cohesive air stream is always directed at the target individual. 
+## Overview
 
-While this proof of concept uses a small, low-cost, consumer face tracking device and DIY tripod-mounted laminar air purifier designed by Nukit, the output of far more powerful and silent filtration units could be directed through large bore flexible conduits to standard computer-controlled gimbals of the type already used for remote cameras. Multiple units could be mounted on lighting scaffolding and triangulated on high-profile performers to prevent missed performances (with hopefully appropriate mitigations for the audience as well).
+The Laminar Cannon detects faces in real-time and mechanically aims fans through a HEPA filter to direct clean air at people. A Flask server running YOLO detection communicates with a Raspberry Pi that controls pan/tilt servos and PWM fans.
 
-The concept extends to 222nm Far-UVC. Depth cameras and off-the-shelf software running on low-cost hardware could easily set up multiple tracking "spotlights" to follow a performer's position on stage and adjust their power output in response to distance, ensuring the performer stays within safe TLV. This would allow for full protection in venues or on stages too large to completely saturate with Far-UVC.
+Inspired by PC fan powered airpurifiers, this project started with an excellent base by forking from the [Nukit Laminar Cannon](https://github.com/opennukit/Nukit-Laminar-Cannon/). This is a from-scratch build using off-the-shelf components, that I mostly had in my apartment, using python face detection rather than expensive camera eqipment. Nukit has a lot of great information about why this style of airpurifier is effective and I'll defer to them, rather than repeating it. 
 
-**Further development of this concept will focus on three key tasks:**
----
-* Using computational fluid dynamic software to create more efficient laminar nozzle geometries.
-* Vetting face-tracking software packages to ensure optimal performance for this specific task.
-* Examining the viability of semi-localized Far-UVC as a mitigation method if multiple emitters are triangulated on a subject, either on its own or augmenting ambient Far-UVC covering a larger area at lower power.
+**Cost:** ~$180-230 in parts
 
-The responsibility to safely deploy and use the Nukit Laminar Cannon lies entirely with the end user. Machinery Enchantress LLC offers no promises or warranties of any kind and is not liable for any mishaps that occur as a result of using these files.
+## How It Works
 
-**FAQ**
----
-**Will you be offering a complete, detailed build manual?**
+1. Pi captures images at ~2 FPS
+2. Flask server detects faces using YOLO via Temporal workflow
+3. Server calculates servo movements needed to center the face
+4. Pi moves servos and turns on fans
+5. Fans turn off 5 seconds after last detection
 
-The STL files and BOM are sufficient for a reasonably handy person to construct one for experimentation and iteration. Given its experimental nature, and that the effectiveness of the Laminar Cannon has not been quantified, making it too accessible is not really a feature.
+### Why Temporal?
 
+The Pi Zero 2W can't run YOLO detection locally - it would take 10+ seconds per frame. By offloading detection to a Temporal workflow on a more powerful machine:
 
-**Does this replace a well-fitted respirator?**
+- **Pi stays lightweight** - Only handles camera capture and servo control
+- **Fast detection** - YOLO runs on server hardware in <100ms
+- **Scalable** - Add more Pi units tracking different areas, all using the same detection server
+- **Reliable** - Temporal handles retries and failure recovery automatically
 
-No. Almost nothing does. This device may- with some iteration, offer some level of protection for performers and public speakers who refuse to mask, or be used in parts of the world where local regimes are passing draconian laws that prevent masking. Wearing a respirator is always preferred- if possible.
+One detection server can support dozens of tracking units.
 
+## Hardware
 
-**Where can I buy this? Will you sell it?**
+- Raspberry Pi Zero 2 W + Camera Module
+- Adafruit 16-Channel PWM Servo Bonnet
+- 2x MG90S Pan/Tilt Servos
+- 2x High Static pressure 120mm 12v fans (>2.2mm H₂O static pressure)
+- LM2596 Buck Converter (12V→5V)
+- 12V/5A Power Supply
+- Levoit Core 200S HEPA Filter
 
-They aren't for sale and probably will never be —at least in this form. Quite a bit of testing would need to be done before they can be released for public use, but the basic concepts may be incorporated into future Nukit products.
+### Wiring
 
+```
+Power Supplies:
+┌──────────────────┐          ┌──────────────────┐
+│  USB 5V/3A       │          │  12V/5A Power    │
+│  (Raspberry Pi)  │          │  Supply          │
+└────────┬─────────┘          └────────┬─────────┘
+         │                             │ 12V
+         │ 5V                     ┌────┴────┐
+         │                        │         │
+         ▼                        ▼         ▼
+┌────────────────────┐                      │
+│  Raspberry Pi      │    ┌──────────────┐  │
+│                    │    │   LM2596     │  │
+│                    │    │ Buck Convert │  │
+│                    │    │ 12V → 5V     │  │
+│                    │    └──────┬───────┘  │
+│                    │           │ 5V       │ 12V
+│  I2C (GPIO 2/3)    │           ▼          │
+│         │          │    ┌──────────────┐  │
+│         └──────────┼───►│Servo Bonnet  │  │
+│                    │    │  (stacked)   │  │
+│                    │    │              │  │
+│                    │    │ V+ ◄─────────┘  │ (5V for servos)
+│                    │    │ Ch 0 ───────────┼──► Pan Servo
+│                    │    │ Ch 1 ───────────┼──► Tilt Servo
+│  GPIO 18 (Pin 12)  │    │              │  │
+│  Hardware PWM ─────┼────┼──────────────┼──┼──► Fan 1 PWM (Pin 4)
+│                    │    │              │  │         │
+│  ┌──────────┐      │    │              │  │         │ Daisy-chain
+│  │ Pi Camera│      │    └──────────────┘  │         └─► Fan 2 PWM
+│  │ (CSI)    │      │                      │
+│  └──────────┘      │                      │
+│                    │                      │
+│      GND───────────┼──────────────────────┼─┐ Common GND
+└────────────────────┘                      │ │
+                                            │ │
+                                   ┌────────┴─┴──┐
+                                   │             │
+                                   ▼             ▼
+                              ┌─────────┐   ┌─────────┐
+                              │ Fan 1   │   │ Fan 2   │
+                              │ 120mm   │   │ 120mm   │
+                              │ PWM     │   │ PWM     │
+                              │         │   │         │
+                              │ Pin 1: GND──┼─Pin 1: GND
+                              │ Pin 2: 12V──┼─Pin 2: 12V
+                              │ Pin 4: PWM──┼►Pin 4: PWM (chained)
+                              └────┬────┘   └────┬────┘
+                                   │             │
+                                   └─────────────┘
 
-**Who made this?**
+```
 
-Nukit has a “Skunk Works”, which, in this context refers to in-house work done on special concept builds intended for limited deployment. These are used to gauge consumer acceptance, practicality, and technical feasibility of novel mitigation measures. The knowledge gained in the process may result in production units or simply additional data points to shape future product development. We try to Open Source those designs and put them into the public domain whenever possible. For one, to prevent others from patenting them and putting those ideas out of reach of those who need them most.
+## Configuration
 
-**Fabrication**
----
-We suggest [SuperBuy](https://www.superbuy.com/en/) for all TaoBao components. This project requires a 3D printer and a reasonable degree of technical ability to execute. Regrettably, we cannot offer sourcing or fabrication assistance.
+Edit `pi/.env`:
 
-**Internal View and Assembly**
-![Nukit Laminar Cannon Internal View and Assembly](https://github.com/opennukit/Nukit-Laminar-Cannon/blob/main/Content/Laminar-Canon-Internals.jpg?raw=true)
+```bash
+DETECTION_SERVER_URL=http://192.168.1.100:5001/detect-person
+FAN_SPEED=80                    # 0-100%
+FACE_DETECTION_TIMEOUT=5        # Seconds
+```
 
-**License**
----
-The Nukit Laminar Cannon is released under GPL-3. 
-https://www.gnu.org/licenses/gpl-3.0.en.html
+## Quick Start
 
-TLDR;
-(For our purposes, “software” refers to the digital files used to make Nukit Open Air Purifiers)
+### 1. Detection Server
 
-1. Anyone can copy, modify and distribute this software.
-2. You have to include the license and copyright notice with each and every distribution.
-3. You can use this software privately.
-4. You can use this software for commercial purposes.
-5. If you dare build your business solely from this code, you risk open-sourcing the whole code base.
-6. If you modify it, you have to indicate changes made to the code.
-7. Any modifications of this code base MUST be distributed with the same license, GPLv3.
-8. This software is provided without warranty.
-9. The software author or license can not be held liable for any damages inflicted by the software.
+Run on your Mac/PC:
 
+```bash
+cd flask
+pip install -r requirements.txt
+
+# Start these in separate terminals:
+temporal server start-dev
+python worker.py
+python app.py
+```
+
+### 2. Raspberry Pi
+
+```bash
+cd pi
+pip install -r requirements.txt
+cp .env.example .env
+nano .env  # Set your server IP
+
+python test-hardware.py # Test all your hardware step by step. 
+#This is encouraged because it is very top heavy and can the thing can flip over if you arne't careful with how you mount things or how fast you let the servors move. Don't ask me how I know. . . 
+python calibrate.py  # Calibrate servos
+python app.py        # Start tracking
+```
+## License
+
+Matching the original [Nukit Laminar Cannon](https://github.com/opennukit/Nukit-Laminar-Cannon/). This is also a [GPL-3 project](https://www.gnu.org/licenses/gpl-3.0.en.html). 
+Feel free to fork and adapt!

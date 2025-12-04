@@ -1,0 +1,5 @@
+# Pi Zero 2W dependencies for Laminar Cannon
+adafruit-circuitpython-servokit  # Servo control via I2C
+requests                          # HTTP client for detection server
+python-dotenv                     # Environment variable management
+Pillow                            # Image processing (rotation)

@@ -10,11 +10,11 @@ FILE_DESCRIPTION(
 
 FILE_NAME(
 /* name */ 'Laminar Cannon Back Plate 120mm.step',
-/* time_stamp */ '2025-08-04T11:13:54-04:00',
+/* time_stamp */ '2025-11-13T11:57:00-05:00',
 /* author */ (''),
 /* organization */ (''),
 /* preprocessor_version */ 'ST-DEVELOPER v20.1',
-/* originating_system */ 'Autodesk Translation Framework v14.10.0.0',
+/* originating_system */ 'Autodesk Translation Framework v14.17.0.0',
 /* authorisation */ '');
 
 FILE_SCHEMA (('AUTOMOTIVE_DESIGN { 1 0 10303 214 3 1 1 }'));

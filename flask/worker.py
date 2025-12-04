@@ -4,7 +4,7 @@ import sys
 from temporalio.client import Client
 from temporalio.worker import Worker
 from workflows import personDetection
-from activities import detect_person_in_image
+from activities import detect_person_in_image, save_debug_image
 from model_manager import yolo_model_manager
 
 # Configure logging
@@ -40,7 +40,7 @@ async def main():
         client,
         task_queue="person-detection-task-queue",
         workflows=[personDetection],
-        activities=[detect_person_in_image],
+        activities=[detect_person_in_image, save_debug_image],
     )
 
     # === Execution Phase ===
