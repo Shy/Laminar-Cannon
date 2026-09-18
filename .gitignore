@@ -473,3 +473,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# Laminar Cannon specifics
+captures/              # camera_test.py output
+tests/fixtures/*.jpg   # photos of real people; keep them out of git
+yolo11*.pt             # model weights, downloaded on first run

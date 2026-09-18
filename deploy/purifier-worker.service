@@ -1,0 +1,44 @@
+[Unit]
+Description=Air purifier person-tracking worker (Temporal, camera + servos)
+Documentation=https://github.com/shy/airPurifier
+# The worker needs a routable network to reach Temporal Cloud; without
+# network-online it starts before DHCP settles and spends its first minute
+# failing to connect.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=shy
+Group=shy
+WorkingDirectory=/home/shy/purifier
+Environment=HOME=/home/shy
+ExecStart=/home/shy/.local/bin/uv run python -m purifier.worker_pi
+
+# A dead worker looks identical to a Temporal failure from the UI, so always
+# come back rather than leaving the Schedule quietly skipping every tick.
+Restart=always
+RestartSec=5s
+
+# The Pi Zero 2 W has 415 MB total. Cap the worker so a leak degrades one
+# service instead of taking the whole board down and dropping SSH with it.
+MemoryMax=220M
+MemoryHigh=180M
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=purifier-worker
+
+# The camera and I2C bus are the only hardware touched. Everything else is
+# locked down so a bad deploy cannot wander around the filesystem.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/home/shy/purifier
+DeviceAllow=/dev/i2c-1 rw
+DeviceAllow=char-video4linux rw
+DeviceAllow=/dev/dma_heap rw
+
+[Install]
+WantedBy=multi-user.target

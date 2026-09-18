@@ -1,0 +1,66 @@
+[project]
+name = "purifier"
+version = "0.1.0"
+description = "Person-tracking camera on Temporal: Pi Zero 2 W camera and servos, MacBook pose detection"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "temporalio>=1.9",
+    "python-dotenv>=1.0",
+]
+
+# Split so torch never lands on the Pi. `uv sync --extra pi` on the Pi,
+# `uv sync --extra mac` on the MacBook.
+[project.optional-dependencies]
+# smbus2 only. Blinka's `board` module drags in a GPIO backend even for
+# I2C-only use, and that backend (lgpio) has no aarch64 wheel and needs swig
+# plus root to build. purifier.pca9685 talks to the chip directly instead.
+pi = [
+    "smbus2>=0.5",
+]
+mac = [
+    "ultralytics>=8.3",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.11",
+    "pytest>=8.0",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/purifier"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_unreachable = true
+
+# The Pi-only and Mac-only libraries are never both installed, so one of these
+# import blocks is always unresolvable on any given machine.
+[[tool.mypy.overrides]]
+module = ["smbus2", "smbus2.*"]
+ignore_missing_imports = true
+
+# ultralytics re-exports YOLO from a submodule without declaring it in
+# __all__, so strict mode rejects the import even though it resolves.
+[[tool.mypy.overrides]]
+module = ["ultralytics", "ultralytics.*", "PIL", "PIL.*"]
+ignore_missing_imports = true
+implicit_reexport = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
